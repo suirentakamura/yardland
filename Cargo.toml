@@ -1,0 +1,17 @@
+[package]
+name = "yardland"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "^0.2"
+once_cell = "^1.18"
+num_enum = "^0.6"
+log = "^0.4"
+
+[dependencies.sdl2]
+version = "^0.35"
+features = ["bundled"]
+
+[build-dependencies]
+cc = "^1.0"

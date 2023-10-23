@@ -1,0 +1,72 @@
+ca65 V2.19 - Git ce3bcad
+Main file   : sys.s
+Current file: sys.s
+
+000000r 1               ; ---------------------------------------------------------------------------
+000000r 1               ; sys.s
+000000r 1               ; ---------------------------------------------------------------------------
+000000r 1               ;
+000000r 1               ; System code for Yardland
+000000r 1               
+000000r 1               	.setcpu	"65816"
+000000r 1                   .smart on
+000000r 1                   .importzp sp
+000000r 1                   .import popa
+000000r 1                   .export _mmu_map_bank
+000000r 1                   .export _dma_transferb_vr
+000000r 1               
+000000r 1               .segment "CODE"
+000000r 1               
+000000r 1               ; ----------------------------------------------------------------------
+000000r 1               ; void __fastcall__ mmu_map_bank (unsigned short real, unsigned char virt)
+000000r 1               ; ----------------------------------------------------------------------
+000000r 1               
+000000r 1               .proc _mmu_map_bank
+000000r 1               
+000000r 1  E2 20            sep #$20
+000002r 1  8D rr rr         sta @Virt ; VIRT BANK (B)
+000005r 1  C2 20            rep #$20
+000007r 1  20 rr rr         jsr popa
+00000Ar 1  8D rr rr         sta @Real ; REAL BANK (W)
+00000Dr 1               
+00000Dr 1  02 02            cop #2
+00000Fr 1  00               .byte 0
+000010r 1               
+000010r 1  A5 00        @Virt: .word $a5
+000012r 1  A5 A5        @Real: .word $a5a5
+000014r 1               
+000014r 1  E2 20            sep #$20
+000016r 1               
+000016r 1  60               rts
+000017r 1               
+000017r 1               .endproc
+000017r 1               
+000017r 1               ; ----------------------------------------------------------------------------------------------
+000017r 1               ; void __cdecl__ dma_transferb_vr (unsigned long src, unsigned long dest, unsigned long size)
+000017r 1               ; ----------------------------------------------------------------------------------------------
+000017r 1               
+000017r 1               .proc _dma_transferb_vr
+000017r 1               
+000017r 1  C2 20            rep #$20
+000019r 1  A0 00            ldy #0
+00001Br 1  B1 rr        :   lda (sp),y
+00001Dr 1  8D rr rr         sta @Src
+000020r 1  C8               iny
+000021r 1  C0 06            cpy #6
+000023r 1  D0 F6            bne :-
+000025r 1               
+000025r 1  02 06            cop #6
+000027r 1               
+000027r 1  01               .byte 1
+000028r 1  A5 A5 A5 A5  @Src:  .dword $a5a5a5a5 ; Placeholder
+00002Cr 1  A5 A5 A5 A5  @Dest: .dword $a5a5a5a5 ; Placeholder
+000030r 1  A5 A5 A5 A5  @Size: .dword $a5a5a5a5 ; Placeholder
+000034r 1               
+000034r 1  A5 rr            lda sp
+000036r 1  E9 0C 00         sbc #12
+000039r 1  85 rr            sta sp
+00003Br 1               
+00003Br 1  60               rts
+00003Cr 1               
+00003Cr 1               .endproc
+00003Cr 1               
