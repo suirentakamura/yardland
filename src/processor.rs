@@ -10,6 +10,10 @@ macro_rules! le_u16_as_u32 {
     };
 }
 
+pub struct Processor {
+    trace: bool
+}
+
 pub fn processor_func(trace: bool) {
     reset(trace);
 

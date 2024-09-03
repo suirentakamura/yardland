@@ -9,7 +9,7 @@
 
 .export   __STARTUP__ : absolute = 1        ; Mark as startup
 .import   __RAM_START__, __RAM_SIZE__       ; Linker generated
-.import   __URAM_START__, __URAM_SIZE__       ; Linker generated
+.import   __HRAM_START__, __HRAM_SIZE__       ; Linker generated
 
 .import    copydata, zerobss, initlib, donelib
 

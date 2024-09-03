@@ -3,8 +3,8 @@
 
 #define DISP_W 1024
 #define DISP_H 720
-#define DISPLAY ((unsigned char*)0xA0000)
-#define IMAGE ((unsigned char*)0x10000)
+#define VGA_BUFFER lptr(0xA0000)
+#define IMAGE lptr(0x10000)
 
 /*
 void draw_image(int w, int h, unsigned *src) {
@@ -26,10 +26,10 @@ void main() {
     //dma_transferb(0x10000, 0xA0000, 0x280, DMA_TRANSFERB_VR);
     //dma_transferb(0x10280, 0xA0800, 0x280, DMA_TRANSFERB_VR);
 
-    while (true) {
+    while (y < 480) {
         unsigned short int s_off = y * 640;
         unsigned short int d_off = y * 2048;
-        dma_transferb(0x1, 0x0 + s_off, 0xA, 0x0 + d_off, (unsigned long int)640, DMA_TRANSFERB_VR);
+        dma_transferb(IMAGE + s_off, VGA_BUFFER + d_off, (unsigned long int)640, DMA_TRANSFERB_VR);
         ++y;
     }
 

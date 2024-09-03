@@ -1,56 +1,83 @@
-mod memory;
-mod processor;
+#![feature(ascii_char)]
 
-use std::thread;
-use sdl2::{
-    render::TextureAccess,
-    pixels::PixelFormatEnum
-};
+use bevy::prelude::*;
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
+
+mod tests;
+mod machine;
+
+#[derive(Resource, Debug)]
+struct AppSettings {
+    trace: bool,
+    input_file: std::path::PathBuf
+}
 
 pub fn main() {
-    let bin = std::fs::read("assets/test/rom.bin").unwrap();
-    memory::dma_moveb_in(bin.as_slice(), 0xF000);
-    let bin = std::fs::read("assets/test.bgr").unwrap();
-    memory::dma_moveb_in(bin.as_slice(), 0x10000);
+    // let trace = !std::env::args().nth(1).unwrap_or(String::from("F")).eq("T");
+    // let input_file = std::path::PathBuf::from(&std::env::args().nth(2).unwrap());
 
-    let sdl = sdl2::init().unwrap();
-    let sdl_video = sdl.video().unwrap();
-    let mut event_pump = sdl.event_pump().unwrap();
+    App::new()
+        .add_plugins(DefaultPlugins
+            .build()
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Yardland".into(),
+                    ..default()
+                }),
+                ..default()
+            })
+        )
+        .add_plugins(EguiPlugin)
+        // .insert_resource(AppSettings { trace, input_file })
+        .add_systems(Update, ui_example_system)
+        .run();
 
-    let window = sdl_video.window("Yardland", 1024, 720)
-        .position_centered()
-        .vulkan()
-        .build()
-        .unwrap();
+    /*
 
-    let mut canvas = window.into_canvas().accelerated().build().unwrap();
-    let texture_creator = canvas.texture_creator();
-    let mut texture = texture_creator.create_texture(Some(PixelFormatEnum::RGB565), TextureAccess::Streaming, 1024, 720).unwrap();
+    let mut mmu = MmuDevice::new();
+    let machine = Machine::new(&mut mmu);
 
-    let trace = !std::env::args().nth(1).unwrap_or(String::from("F")).eq("T");
+    let mut ram_slice = [0u8; 0x10000];
+    let ram_size = ram_slice.len() as u64;
+    let mut ram = RamDevice::new(&mut ram_slice);
+    machine.mmu.map_device(0, ram_size, &mut ram);
 
-    thread::spawn(move || processor::processor_func(trace));
+    let serial = SerialDevice::new();
+    let mut running_serial = serial.start();
+    machine.mmu.map_device(0x10000, SERIAL_REG_PIPE2, &mut running_serial);
 
-    'main: loop {
-        for event in event_pump.poll_iter() {
-            use sdl2::event::Event;
+    machine.mmu.write_byte(0x10000 + SERIAL_REG_CONTROL, SERIAL_CONTROL_PIPE1_ENABLE).unwrap();
 
-            match event {
-                Event::Quit {..} => {
-                    break 'main
-                }
-                _ => {}
-            }
-        }
+    let string = format!("{:?}\n", machine);
 
-        canvas.clear();
-
-        texture.with_lock(None, |pixels: &mut [u8], pitch| {
-            memory::dma_moveb_out_r(pixels, 0xA0000, pitch * 720);
-        }).unwrap();
-
-        canvas.copy(&texture, None, None).unwrap();
-
-        canvas.present();
+    for (i, c) in string.as_ascii().unwrap().iter().enumerate() {
+        machine.mmu.write_byte(i as u64, c.to_u8()).unwrap();
+        machine.mmu.write_byte(0x10000 + SERIAL_REG_PIPE1, c.to_u8()).unwrap();
     }
+
+    //println!("{}", string);
+
+    loop {
+        let status = machine.mmu.read_byte(0x10000 + SERIAL_REG_STATUS).unwrap();
+
+        machine.mmu.write_byte(0x10000 + SERIAL_REG_PIPE1, b'A').unwrap();
+
+        //if status & SERIAL_STATUS_PIPE1_RX != 0 {
+        /*
+            let c = machine.mmu.read_byte(0x10000 + SERIAL_REG_PIPE1).unwrap();
+            machine.mmu.write_byte(0x10000 + SERIAL_REG_PIPE1, c).unwrap();
+            */
+        //}
+    }
+
+    // drop(running_serial);
+
+    */
+
+}
+
+fn ui_example_system(mut contexts: EguiContexts) {
+    egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
+        ui.label("World!");
+    });
 }

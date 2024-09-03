@@ -1,4 +1,9 @@
-#![allow(dead_code)]
+use bevy::prelude::*;
+
+#[derive(Component)]
+struct RamDevice;
+
+/*#![allow(dead_code)]
 
 #[cfg(test)]
 mod tests;
@@ -7,9 +12,9 @@ use std::sync::RwLock;
 use std::collections::HashMap;
 use once_cell::sync::Lazy;
 
-pub const MEMORY_SIZE: u32 = u32::MAX / 16;
+pub const MEMORY_SIZE: usize = u32::MAX as usize / 16;
 
-static mut BUFFER: RwLock<[u8; MEMORY_SIZE as usize]> = RwLock::new([0u8; MEMORY_SIZE as usize]);
+static mut BUFFER: RwLock<[u8; MEMORY_SIZE]> = RwLock::new([0u8; MEMORY_SIZE]);
 static mut BANK_TABLE: Lazy<RwLock<HashMap<u8, u16>>> = Lazy::new(|| {
     let mut bank_table = HashMap::new();
     for i in 0..u8::MAX {
@@ -142,3 +147,4 @@ pub fn dma_transferb_r(src: u32, dest: u32, size: u32) {
         dma_transferb(real_src, real_dest, real_size);
     }
 }
+*/
