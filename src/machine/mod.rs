@@ -1,6 +1,9 @@
-use bevy::prelude::*;
+pub mod memory;
 pub mod mmu;
+
 pub use mmu::MmuDevice;
+
+use bevy::prelude::*;
 
 pub trait Device {
     fn read_byte(&self, address: u64) -> Result<u8, &'static str>;

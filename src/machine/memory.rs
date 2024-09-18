@@ -1,7 +1,104 @@
+use std::mem::MaybeUninit;
+
 use bevy::prelude::*;
 
+pub const MEMORY_SIZE: usize = u32::MAX as usize / 4;
+
 #[derive(Component)]
-struct RamDevice;
+struct PhysicalMemory(Box<[u8; MEMORY_SIZE]>);
+
+impl Default for PhysicalMemory {
+    fn default() -> Self {
+        Self(unsafe { Box::new_uninit().assume_init() })
+    }
+}
+
+impl PhysicalMemory {
+    /// Reads a u8 from the memory.
+    fn read_u8(&self, index: usize) -> u8 {
+        self.0[index]
+    }
+
+    /// Writes a u8 to the memory.
+    fn write_u8(&mut self, index: usize, value: u8) {
+        self.0[index] = value;
+    }
+
+    /// Reads a slice of bytes from the memory.
+    fn read_slice_u8(&self, index: usize, size: usize) -> &[u8] {
+        &self.0[index..index + size]
+    }
+
+    /// Writes a slice of bytes to the memory.
+    fn write_slice_u8(&mut self, index: usize, slice: &[u8]) {
+        self.0[index..index + slice.len()].copy_from_slice(slice);
+    }
+
+    /// Reads a slice of a given type from the memory.
+    ///
+    /// # Beware
+    ///
+    /// This function discards the remaining bytes if the slice is not aligned.
+    fn read_slice<T: From<u8>>(&self, index: usize, size: usize) -> &[T] {
+        let (_, m, _) = unsafe {
+            self.0[index..index + size].align_to::<T>()
+        };
+
+        m
+    }
+
+    /// Writes a slice of a given type to the memory.
+    fn write_slice<T: Into<u8>>(&mut self, index: usize, slice: &[T]) {
+        let (_, m, _) = unsafe {
+            slice.align_to::<u8>()
+        };
+
+        self.0[index..index + m.len()].copy_from_slice(m);
+    }
+
+    fn read<T: From<u8>>(&self, index: usize) -> T {
+        let s = self.read_slice::<T>(index, std::mem::size_of::<T>());
+        T::
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_read_write() {
+        let mut memory = PhysicalMemory::default();
+
+        memory.write(0, 0x12);
+        memory.write(1, 0x34);
+        memory.write(2, 0x56);
+        memory.write(3, 0x78);
+
+        assert_eq!(memory.read::<u8>(0), 0x12);
+        assert_eq!(memory.read::<u8>(1), 0x34);
+        assert_eq!(memory.read::<u8>(2), 0x56);
+        assert_eq!(memory.read::<u8>(3), 0x78);
+    }
+
+    #[test]
+    fn test_memory_read_write_slice() {
+        let mut memory = PhysicalMemory::default();
+
+        memory.write_slice_u8(0, &[0x12, 0x34, 0x56, 0x78]);
+
+        assert_eq!(memory.read_slice::<u32>(0, 4), &[0x78563412]);
+    }
+
+    #[test]
+    fn test_memory_read_write_slice_unaligned() {
+        let mut memory = PhysicalMemory::default();
+
+        memory.write_slice_u8(0, &[0x12, 0x34, 0x56, 0x78, 0x9A]);
+
+        assert_eq!(memory.read_slice::<u32>(0, 5), &[0x78563412]);
+    }
+}
 
 /*#![allow(dead_code)]
 
@@ -12,7 +109,6 @@ use std::sync::RwLock;
 use std::collections::HashMap;
 use once_cell::sync::Lazy;
 
-pub const MEMORY_SIZE: usize = u32::MAX as usize / 16;
 
 static mut BUFFER: RwLock<[u8; MEMORY_SIZE]> = RwLock::new([0u8; MEMORY_SIZE]);
 static mut BANK_TABLE: Lazy<RwLock<HashMap<u8, u16>>> = Lazy::new(|| {

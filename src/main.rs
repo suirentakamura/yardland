@@ -1,9 +1,9 @@
 #![feature(ascii_char)]
+#![feature(new_uninit)]
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
-mod tests;
 mod machine;
 
 #[derive(Resource, Debug)]
