@@ -1,37 +1,56 @@
-use std::mem::MaybeUninit;
+use std::{
+    any::Any,
+    sync::RwLock,
+    intrinsics::transmute_unchecked,
+    mem::{size_of, transmute}
+};
 
 use bevy::prelude::*;
+use bevy_egui::egui::util::id_type_map::TypeId;
+use desert::{FromBytesLE, ToBytesLE};
 
-pub const MEMORY_SIZE: usize = u32::MAX as usize / 4;
+pub struct MemoryPlugin;
 
-#[derive(Component)]
-struct PhysicalMemory(Box<[u8; MEMORY_SIZE]>);
+impl Plugin for MemoryPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_non_send_resource::<PhysicalMemory>();
+    }
+}
+
+pub const MEMORY_SIZE: usize = u16::MAX as usize;
+
+#[derive(Resource)]
+pub struct PhysicalMemory(RwLock<Box<[u8; MEMORY_SIZE]>>);
 
 impl Default for PhysicalMemory {
     fn default() -> Self {
-        Self(unsafe { Box::new_uninit().assume_init() })
+        Self(RwLock::new(
+            unsafe { Box::new_uninit().assume_init() }
+        ))
     }
 }
 
 impl PhysicalMemory {
     /// Reads a u8 from the memory.
     fn read_u8(&self, index: usize) -> u8 {
-        self.0[index]
+        self.0.read().unwrap()[index]
     }
 
     /// Writes a u8 to the memory.
     fn write_u8(&mut self, index: usize, value: u8) {
-        self.0[index] = value;
+        self.0.write().unwrap()[index] = value;
     }
 
     /// Reads a slice of bytes from the memory.
-    fn read_slice_u8(&self, index: usize, size: usize) -> &[u8] {
-        &self.0[index..index + size]
+    fn read_slice_u8(&self, index: usize, size: usize, slice: &mut [u8]) {
+        let lock = self.0.read().unwrap();
+        slice.copy_from_slice(&lock[index..index + size]);
     }
 
     /// Writes a slice of bytes to the memory.
     fn write_slice_u8(&mut self, index: usize, slice: &[u8]) {
-        self.0[index..index + slice.len()].copy_from_slice(slice);
+        let mut lock = self.0.write().unwrap();
+        lock[index..index + slice.len()].copy_from_slice(slice);
     }
 
     /// Reads a slice of a given type from the memory.
@@ -39,26 +58,52 @@ impl PhysicalMemory {
     /// # Beware
     ///
     /// This function discards the remaining bytes if the slice is not aligned.
-    fn read_slice<T: From<u8>>(&self, index: usize, size: usize) -> &[T] {
-        let (_, m, _) = unsafe {
-            self.0[index..index + size].align_to::<T>()
-        };
-
-        m
+    pub fn read_slice<T: Any>(&self, index: usize, size: usize, slice: &mut [T]) {
+        unsafe {
+            self.read_slice_u8(index, size, transmute(slice))
+        }
     }
 
     /// Writes a slice of a given type to the memory.
-    fn write_slice<T: Into<u8>>(&mut self, index: usize, slice: &[T]) {
+    pub fn write_slice<T: Any>(&mut self, index: usize, slice: &[T]) {
+        if TypeId::of::<u8>() == TypeId::of::<T>() {
+            return unsafe {
+                self.write_slice_u8(index,  transmute(slice))
+            }
+        }
+
         let (_, m, _) = unsafe {
             slice.align_to::<u8>()
         };
 
-        self.0[index..index + m.len()].copy_from_slice(m);
+        self.write_slice_u8(index, m);
     }
 
-    fn read<T: From<u8>>(&self, index: usize) -> T {
-        let s = self.read_slice::<T>(index, std::mem::size_of::<T>());
-        T::
+    /// Reads a value of a given type from the memory.
+    pub fn read<T: FromBytesLE + Any>(&self, index: usize) -> Result<T, desert::Error> {
+        if TypeId::of::<u8>() == TypeId::of::<T>() {
+            return Ok(unsafe {
+                transmute_unchecked::<u8, T>(self.read_u8(index))
+            });
+        }
+
+        let mut v: Vec<u8> = Vec::with_capacity(std::mem::size_of::<T>() + 69);
+        self.read_slice_u8(index, std::mem::size_of::<T>(), v.as_mut_slice());
+        T::from_bytes_le(v.as_slice()).map(|(_, t)| t)
+    }
+
+    /// Writes a value of a given type to the memory.
+    pub fn write<T: ToBytesLE + Any>(&mut self, index: usize, value: T) -> Result<(), desert::Error> {
+        if TypeId::of::<u8>() == TypeId::of::<T>() {
+            self.write_u8(index, unsafe {
+                transmute_unchecked::<T, u8>(value)
+            });
+            return Ok(());
+        }
+
+        let s = value.to_bytes_le()?;
+        self.write_slice_u8(index, s.as_slice());
+        Ok(())
     }
 }
 
@@ -70,15 +115,20 @@ mod tests {
     fn test_memory_read_write() {
         let mut memory = PhysicalMemory::default();
 
-        memory.write(0, 0x12);
-        memory.write(1, 0x34);
-        memory.write(2, 0x56);
-        memory.write(3, 0x78);
+        memory.write_u8(0, 0x12);
+        memory.write_u8(1, 0x34);
+        memory.write_u8(2, 0x56);
+        memory.write_u8(3, 0x78);
 
-        assert_eq!(memory.read::<u8>(0), 0x12);
-        assert_eq!(memory.read::<u8>(1), 0x34);
-        assert_eq!(memory.read::<u8>(2), 0x56);
-        assert_eq!(memory.read::<u8>(3), 0x78);
+        assert_eq!(memory.read_u8(0), 0x12);
+        assert_eq!(memory.read_u8(1), 0x34);
+        assert_eq!(memory.read_u8(2), 0x56);
+        assert_eq!(memory.read_u8(3), 0x78);
+
+        assert_eq!(memory.read::<u8>(0).unwrap(), 0x12);
+        assert_eq!(memory.read::<u8>(1).unwrap(), 0x34);
+        assert_eq!(memory.read::<u8>(2).unwrap(), 0x56);
+        assert_eq!(memory.read::<u8>(3).unwrap(), 0x78);
     }
 
     #[test]
@@ -87,7 +137,7 @@ mod tests {
 
         memory.write_slice_u8(0, &[0x12, 0x34, 0x56, 0x78]);
 
-        assert_eq!(memory.read_slice::<u32>(0, 4), &[0x78563412]);
+        assert_eq!(memory.read::<u32>(0).unwrap(), 0x78563412);
     }
 
     #[test]
@@ -96,7 +146,28 @@ mod tests {
 
         memory.write_slice_u8(0, &[0x12, 0x34, 0x56, 0x78, 0x9A]);
 
-        assert_eq!(memory.read_slice::<u32>(0, 5), &[0x78563412]);
+        assert_eq!(memory.read::<u32>(0).unwrap(), 0x78563412);
+    }
+
+    #[test]
+    fn test_memory_read_write_slice_type() {
+        let mut memory = PhysicalMemory::default();
+
+        memory.write_slice(0, "Hello, World!".as_bytes());
+
+        let mut v: Vec<u8> = Vec::with_capacity(13);
+        memory.read_slice(0, 13, v.as_mut_slice());
+
+        assert_eq!(v.as_slice(), "Hello, World!".as_bytes());
+    }
+
+    #[test]
+    fn test_memory_read_write_type() {
+        let mut memory = PhysicalMemory::default();
+
+        memory.write(0, 0x78563412u32).unwrap();
+
+        assert_eq!(memory.read::<u32>(0).unwrap(), 0x78563412);
     }
 }
 
@@ -105,7 +176,7 @@ mod tests {
 #[cfg(test)]
 mod tests;
 
-use std::sync::RwLock;
+
 use std::collections::HashMap;
 use once_cell::sync::Lazy;
 

@@ -1,5 +1,7 @@
 #![feature(ascii_char)]
 #![feature(new_uninit)]
+#![feature(min_specialization)]
+#![feature(core_intrinsics)]
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
