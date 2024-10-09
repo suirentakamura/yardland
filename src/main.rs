@@ -1,37 +1,42 @@
 #![feature(ascii_char)]
-#![feature(new_uninit)]
 #![feature(min_specialization)]
 #![feature(core_intrinsics)]
 
-use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
-
+mod menus;
 mod machine;
 
-#[derive(Resource, Debug)]
+use menus::MenusPlugin;
+use machine::MachinePlugin;
+use std::path::PathBuf;
+use bevy::{prelude::*, window::WindowResolution};
+use bevy_egui::EguiPlugin;
+use bevy_pixels::prelude::*;
+
+#[derive(Resource, Default, Debug)]
 struct AppSettings {
-    trace: bool,
-    input_file: std::path::PathBuf
+    pub running: bool,
+    pub trace: bool,
+    pub input_file: Option<PathBuf>
 }
 
 pub fn main() {
-    // let trace = !std::env::args().nth(1).unwrap_or(String::from("F")).eq("T");
-    // let input_file = std::path::PathBuf::from(&std::env::args().nth(2).unwrap());
-
     App::new()
-        .add_plugins(DefaultPlugins
-            .build()
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Yardland".into(),
+        .add_plugins((
+            DefaultPlugins
+                .build()
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Yardland".into(),
+                        resolution: WindowResolution::new(640., 480.),
+                        ..default()
+                    }),
                     ..default()
                 }),
-                ..default()
-            })
-        )
-        .add_plugins(EguiPlugin)
-        // .insert_resource(AppSettings { trace, input_file })
-        .add_systems(Update, ui_example_system)
+            EguiPlugin,
+            PixelsPlugin::default(),
+        ))
+        .add_plugins((MenusPlugin, MachinePlugin))
+        .init_resource::<AppSettings>()
         .run();
 
     /*
@@ -76,10 +81,4 @@ pub fn main() {
 
     */
 
-}
-
-fn ui_example_system(mut contexts: EguiContexts) {
-    egui::Window::new("Hello").show(contexts.ctx_mut(), |ui| {
-        ui.label("World!");
-    });
 }

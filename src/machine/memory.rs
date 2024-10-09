@@ -1,57 +1,54 @@
 use std::{
     any::Any,
-    sync::RwLock,
+    sync::{Arc, RwLock},
     intrinsics::transmute_unchecked,
     mem::{size_of, transmute}
 };
-
 use bevy::prelude::*;
-use bevy_egui::egui::util::id_type_map::TypeId;
 use desert::{FromBytesLE, ToBytesLE};
 
 pub struct MemoryPlugin;
 
 impl Plugin for MemoryPlugin {
     fn build(&self, app: &mut App) {
-        app.init_non_send_resource::<PhysicalMemory>();
+        app.init_resource::<PhysicalMemory>();
     }
 }
 
-pub const MEMORY_SIZE: usize = u16::MAX as usize;
+pub const MEMORY_SIZE: usize = u32::MAX as usize / 4;
 
-#[derive(Resource)]
-pub struct PhysicalMemory(RwLock<Box<[u8; MEMORY_SIZE]>>);
-
-impl Default for PhysicalMemory {
-    fn default() -> Self {
-        Self(RwLock::new(
-            unsafe { Box::new_uninit().assume_init() }
-        ))
-    }
-}
+#[derive(Default, Resource)]
+pub struct PhysicalMemory(Arc<RwLock<Vec<u8>>>);
 
 impl PhysicalMemory {
+    /// Checks if the memory can be locked for a read.
+    pub fn can_read(&self) -> bool {
+        self.0.try_read().is_ok()
+    }
+
     /// Reads a u8 from the memory.
-    fn read_u8(&self, index: usize) -> u8 {
+    pub fn read_u8(&self, index: usize) -> u8 {
         self.0.read().unwrap()[index]
     }
 
     /// Writes a u8 to the memory.
-    fn write_u8(&mut self, index: usize, value: u8) {
+    pub fn write_u8(&mut self, index: usize, value: u8) {
         self.0.write().unwrap()[index] = value;
     }
 
     /// Reads a slice of bytes from the memory.
-    fn read_slice_u8(&self, index: usize, size: usize, slice: &mut [u8]) {
+    pub fn read_slice_u8(&self, index: usize, size: usize, slice: &mut [u8]) {
         let lock = self.0.read().unwrap();
         slice.copy_from_slice(&lock[index..index + size]);
     }
 
     /// Writes a slice of bytes to the memory.
-    fn write_slice_u8(&mut self, index: usize, slice: &[u8]) {
+    pub fn write_slice_u8(&mut self, index: usize, slice: &[u8]) {
         let mut lock = self.0.write().unwrap();
         lock[index..index + slice.len()].copy_from_slice(slice);
     }
+
+    /*
 
     /// Reads a slice of a given type from the memory.
     ///
@@ -105,6 +102,8 @@ impl PhysicalMemory {
         self.write_slice_u8(index, s.as_slice());
         Ok(())
     }
+
+    */
 }
 
 #[cfg(test)]
@@ -124,13 +123,15 @@ mod tests {
         assert_eq!(memory.read_u8(1), 0x34);
         assert_eq!(memory.read_u8(2), 0x56);
         assert_eq!(memory.read_u8(3), 0x78);
-
+        /*
         assert_eq!(memory.read::<u8>(0).unwrap(), 0x12);
         assert_eq!(memory.read::<u8>(1).unwrap(), 0x34);
         assert_eq!(memory.read::<u8>(2).unwrap(), 0x56);
         assert_eq!(memory.read::<u8>(3).unwrap(), 0x78);
+        */
     }
 
+    /*
     #[test]
     fn test_memory_read_write_slice() {
         let mut memory = PhysicalMemory::default();
@@ -169,6 +170,7 @@ mod tests {
 
         assert_eq!(memory.read::<u32>(0).unwrap(), 0x78563412);
     }
+    */
 }
 
 /*#![allow(dead_code)]

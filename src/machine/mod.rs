@@ -1,9 +1,21 @@
 pub mod memory;
-pub mod mmu;
+pub mod video;
 
-pub use mmu::MmuDevice;
-
+use memory::MemoryPlugin;
+use video::VideoPlugin;
 use bevy::prelude::*;
+
+pub struct MachinePlugin;
+
+impl Plugin for MachinePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins((MemoryPlugin, VideoPlugin));
+    }
+}
+
+/*
+pub mod mmu;
+pub use mmu::MmuDevice;
 
 pub trait Device {
     fn read_byte(&self, address: u64) -> Result<u8, &'static str>;
@@ -91,21 +103,4 @@ impl<'a> Device for RamDevice<'a> {
         Ok(())
     }
 }
-
-fn machine_setup_system(mut commands: Commands) {
-
-}
-
-fn machine_system() {
-
-}
-
-pub struct MachinePlugin;
-
-impl Plugin for MachinePlugin {
-    fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, machine_setup_system)
-            .add_systems(Update, machine_system);
-    }
-}
+ */

@@ -1,3 +1,32 @@
+use crate::machine::memory::PhysicalMemory;
+use bevy::prelude::*;
+use bevy_pixels::prelude::*;
+
+pub const VRAM_BASE: usize = 0xA00_0000;
+pub const VRAM_SIZE: usize = 614_400;
+
+pub struct VideoPlugin;
+
+impl Plugin for VideoPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Draw, copy_fb);
+    }
+}
+
+/// Draws the framebuffer
+fn copy_fb(memory: Res<PhysicalMemory>, mut wrapper_query: Query<&mut PixelsWrapper>) {
+    if memory.can_read() {
+        // Query the `PixelsWrapper` component that owns an instance of `Pixels` for the given window.
+        let Ok(mut wrapper) = wrapper_query.get_single_mut() else { return };
+
+        // Get a mutable slice for the pixel buffer.
+        let frame = wrapper.pixels.frame_mut();
+
+        memory.read_slice_u8(VRAM_BASE, VRAM_SIZE, frame);
+    }
+}
+
+/*
 use sdl2::{
     render::TextureAccess,
     pixels::PixelFormatEnum
@@ -44,3 +73,4 @@ pub fn video() {
         canvas.present();
     }
 }
+*/
