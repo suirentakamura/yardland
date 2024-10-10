@@ -1,4 +1,4 @@
-use crate::AppSettings;
+use crate::{machine::{memory::PhysicalMemory, processor::TestProcessor}, AppSettings};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{TableBuilder, Column};
@@ -8,21 +8,15 @@ pub struct MenusPlugin;
 
 impl Plugin for MenusPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
-            settings_window_system,
-            info_window_system,
-        ));
+        app.add_systems(Update,
+            control_window_system
+        );
     }
 }
 
-fn settings_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSettings>) {
+fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSettings>, processor: Res<TestProcessor>, _memory: Res<PhysicalMemory>) {
     if let Some(ctx_mut) = contexts.try_ctx_mut() {
-        egui::Window::new("Settings").show(ctx_mut, |ui| {
-            ui.label("Hello World!");
-
-            ui.checkbox(&mut settings.running, "Running?");
-            ui.checkbox(&mut settings.trace, "Trace?");
-
+        egui::Window::new("Control").show(ctx_mut, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("Open input file...").clicked() {
                     settings.input_file = FileDialog::new()
@@ -33,14 +27,15 @@ fn settings_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSe
                     ui.label(format!("Selected input file: {:#?}", input_file));
                 }
             });
-        });
-    }
-}
 
-fn info_window_system(mut contexts: EguiContexts, settings: Res<AppSettings>) {
-    if let Some(ctx_mut) = contexts.try_ctx_mut() {
-        egui::Window::new("Info").show(ctx_mut, |ui| {
+            ui.separator();
+
             ui.collapsing("CPU", |ui| {
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut settings.running, "Running?");
+                    ui.checkbox(&mut settings.trace, "Trace?");
+                });
+
                 ui.horizontal(|ui| {
                     if ui.button("Reset").clicked() {
                         // Reset
@@ -51,60 +46,68 @@ fn info_window_system(mut contexts: EguiContexts, settings: Res<AppSettings>) {
                     }
                 });
 
-                ui.label("Frequency: 1.0 MHz");
+                if processor.frequency < 1_000.0 {
+                    ui.label(format!("Frequency: {:.0} Hz", processor.frequency));
+                } else if processor.frequency < 1_000_000.0 {
+                    ui.label(format!("Frequency: {:.03} KHz", processor.frequency / 1_000.0));
+                } else if processor.frequency < 1_000_000_000.0 {
+                    ui.label(format!("Frequency: {:.03} MHz", processor.frequency / 1_000_000.0));
+                } else {
+                    ui.label(format!("Frequency: {:.02} GHz", processor.frequency / 1_000_000_000.0));
+                }
 
                 ui.separator();
 
                 ui.collapsing("Registers", |ui| {
-                    ui.label("A: 0x00000000");
-                    ui.label("B: 0x00000000");
-                    ui.label("C: 0x00000000");
-                    ui.label("X: 0x00000000");
-                    ui.label("Y: 0x00000000");
-                    ui.label("Z: 0x00000000");
-                    ui.label("PC: 0x00000000");
-                    ui.label("SP: 0x00000000");
-                    ui.label("TP: 0x00000000");
+                    ui.horizontal(|ui| {
+                        ui.label("A: 0x0000000000000000");
+                        ui.label("B: 0x0000000000000000");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("C: 0x0000000000000000");
+                        ui.label("D: 0x0000000000000000");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("X: 0x0000000000000000");
+                        ui.label("Y: 0x0000000000000000");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Z: 0x0000000000000000");
+                        ui.label("W: 0x0000000000000000");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("PC: 0x0000000000000000");
+                        ui.label("SP: 0x0000000000000000");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("TP: 0x0000000000000000");
+                        ui.label("DP: 0x0000000000000000");
+                    });
                 });
             });
 
             ui.collapsing("GPU", |ui| {
-                ui.label("Type: VGA-compatible dumb framebuffer");
+                ui.label("Type: Simple Framebuffer");
                 ui.label("Resolution: 640x480");
-                ui.label("Color depth: 16-bpp color");
+                ui.label("Color depth: RGBA 32-bpp color");
 
                 use crate::machine::video::{VRAM_BASE, VRAM_SIZE};
 
                 ui.label(format!("VRAM Range: 0x{:016X} - 0x{:016X}", VRAM_BASE, VRAM_BASE + VRAM_SIZE));
                 ui.label(format!("VRAM Size: {} bytes", VRAM_SIZE));
             });
-
+            /*
             ui.collapsing("Memory", |ui| {
-                /*
-                let buffer_example = [
-                    0xDEu8, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF,
-                    b'H', b'e', b'l', b'l', b'o', b',', b' ', b'W',
-                    b'o', b'r', b'l', b'd', b'!', 0, 0, 0
-                ];
-                */
-
-                let buffer_example = unsafe { Box::<[u8; u16::MAX as usize]>::new_uninit().assume_init() };
-
-                memory_map(ui, buffer_example.as_ref());
+                memory_map(ui, &memory);
             });
+            */
         });
     }
 }
 
 /// Memory map widget
-fn memory_map(ui: &mut egui::Ui, memory: &[u8]) {
+fn memory_map(ui: &mut egui::Ui, physical_memory: &PhysicalMemory) {
+    let memory = physical_memory.lock_read().unwrap();
     let mut table = TableBuilder::new(ui);
 
     /*

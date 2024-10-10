@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.14.2"
+bevy = { version = "0.14.2", features = ["trace"] }
 bevy_egui = "0.30.0"
-bevy_pixels = "0.13.0"
+# bevy_pixels = "0.13.0"
 egui_extras = "0.29.1"
 rfd = "0.15.0"
 libc = "0.2.159"
@@ -17,7 +17,7 @@ log = { version = "0.4.22", features = ["max_level_debug", "release_max_level_wa
 # env_logger = "0.11.5"
 
 [build-dependencies]
-cc = "1.1.26"
+cc = "1.1.28"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

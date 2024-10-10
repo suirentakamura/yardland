@@ -1,8 +1,6 @@
 use std::{
-    any::Any,
-    sync::{Arc, RwLock},
-    intrinsics::transmute_unchecked,
-    mem::{size_of, transmute}
+    sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    // any::Any, intrinsics::transmute_unchecked, mem::{size_of, transmute}
 };
 use bevy::prelude::*;
 use desert::{FromBytesLE, ToBytesLE};
@@ -17,8 +15,14 @@ impl Plugin for MemoryPlugin {
 
 pub const MEMORY_SIZE: usize = u32::MAX as usize / 4;
 
-#[derive(Default, Resource)]
+#[derive(Resource)]
 pub struct PhysicalMemory(Arc<RwLock<Vec<u8>>>);
+
+impl Default for PhysicalMemory {
+    fn default() -> Self {
+        Self(Arc::new(RwLock::new(vec![0u8; MEMORY_SIZE])))
+    }
+}
 
 impl PhysicalMemory {
     /// Checks if the memory can be locked for a read.
@@ -26,26 +30,49 @@ impl PhysicalMemory {
         self.0.try_read().is_ok()
     }
 
-    /// Reads a u8 from the memory.
+    /// Locks the memory for reading and returns the lock guard.
+    pub fn lock_read(&self) -> LockResult<RwLockReadGuard<'_, Vec<u8>>> {
+        self.0.read()
+    }
+
+    /// Locks the memory for writing and returns the lock guard.
+    pub fn lock_write(&self) -> LockResult<RwLockWriteGuard<'_, Vec<u8>>> {
+        self.0.write()
+    }
+
+    /// Reads an u8 from the memory.
     pub fn read_u8(&self, index: usize) -> u8 {
         self.0.read().unwrap()[index]
     }
 
-    /// Writes a u8 to the memory.
-    pub fn write_u8(&mut self, index: usize, value: u8) {
+    /// Writes an u8 to the memory.
+    pub fn write_u8(&self, index: usize, value: u8) {
         self.0.write().unwrap()[index] = value;
     }
 
     /// Reads a slice of bytes from the memory.
-    pub fn read_slice_u8(&self, index: usize, size: usize, slice: &mut [u8]) {
+    pub fn copy_to_slice(&self, index: usize, size: usize, slice: &mut [u8]) {
         let lock = self.0.read().unwrap();
         slice.copy_from_slice(&lock[index..index + size]);
     }
 
     /// Writes a slice of bytes to the memory.
-    pub fn write_slice_u8(&mut self, index: usize, slice: &[u8]) {
+    pub fn copy_from_slice(&self, index: usize, slice: &[u8]) {
         let mut lock = self.0.write().unwrap();
         lock[index..index + slice.len()].copy_from_slice(slice);
+    }
+
+    /// Reads a value of a given type from the memory.
+    pub fn read<T: FromBytesLE>(&self, index: usize) -> T {
+        let lock = self.0.read().unwrap();
+        let (_, t) = T::from_bytes_le(&lock[index..size_of::<T>()]).unwrap();
+        t
+    }
+
+    /// Writes a value of a given type to the memory.
+    pub fn write<T: ToBytesLE>(&mut self, index: usize, value: T) {
+        let mut lock = self.0.write().unwrap();
+        lock[index..size_of::<T>()].copy_from_slice(&value.to_bytes_le().unwrap());
     }
 
     /*
@@ -76,32 +103,7 @@ impl PhysicalMemory {
         self.write_slice_u8(index, m);
     }
 
-    /// Reads a value of a given type from the memory.
-    pub fn read<T: FromBytesLE + Any>(&self, index: usize) -> Result<T, desert::Error> {
-        if TypeId::of::<u8>() == TypeId::of::<T>() {
-            return Ok(unsafe {
-                transmute_unchecked::<u8, T>(self.read_u8(index))
-            });
-        }
 
-        let mut v: Vec<u8> = Vec::with_capacity(std::mem::size_of::<T>() + 69);
-        self.read_slice_u8(index, std::mem::size_of::<T>(), v.as_mut_slice());
-        T::from_bytes_le(v.as_slice()).map(|(_, t)| t)
-    }
-
-    /// Writes a value of a given type to the memory.
-    pub fn write<T: ToBytesLE + Any>(&mut self, index: usize, value: T) -> Result<(), desert::Error> {
-        if TypeId::of::<u8>() == TypeId::of::<T>() {
-            self.write_u8(index, unsafe {
-                transmute_unchecked::<T, u8>(value)
-            });
-            return Ok(());
-        }
-
-        let s = value.to_bytes_le()?;
-        self.write_slice_u8(index, s.as_slice());
-        Ok(())
-    }
 
     */
 }
@@ -112,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_memory_read_write() {
-        let mut memory = PhysicalMemory::default();
+        let memory = PhysicalMemory::default();
 
         memory.write_u8(0, 0x12);
         memory.write_u8(1, 0x34);

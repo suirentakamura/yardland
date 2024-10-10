@@ -1,16 +1,17 @@
 #![feature(ascii_char)]
 #![feature(min_specialization)]
-#![feature(core_intrinsics)]
+#![feature(random)]
+// #![feature(core_intrinsics)]
 
 mod menus;
 mod machine;
 
 use menus::MenusPlugin;
 use machine::MachinePlugin;
-use std::path::PathBuf;
+use std::{path::PathBuf, random::random};
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_egui::EguiPlugin;
-use bevy_pixels::prelude::*;
+// use bevy_pixels::prelude::*;
 
 #[derive(Resource, Default, Debug)]
 struct AppSettings {
@@ -33,10 +34,11 @@ pub fn main() {
                     ..default()
                 }),
             EguiPlugin,
-            PixelsPlugin::default(),
+            // PixelsPlugin::default(),
         ))
-        .add_plugins((MenusPlugin, MachinePlugin))
+        .add_plugins((MachinePlugin, MenusPlugin))
         .init_resource::<AppSettings>()
+        .add_systems(PostStartup, test_system)
         .run();
 
     /*
@@ -81,4 +83,10 @@ pub fn main() {
 
     */
 
+}
+
+fn test_system(memory: Res<machine::memory::PhysicalMemory>) {
+    for i in 0xA000000usize..0xA12C000 {
+        memory.write_u8(i, random());
+    }
 }

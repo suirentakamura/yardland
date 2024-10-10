@@ -1,15 +1,17 @@
 pub mod memory;
 pub mod video;
+pub mod processor;
 
 use memory::MemoryPlugin;
 use video::VideoPlugin;
+use processor::ProcessorPlugin;
 use bevy::prelude::*;
 
 pub struct MachinePlugin;
 
 impl Plugin for MachinePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((MemoryPlugin, VideoPlugin));
+        app.add_plugins((MemoryPlugin, VideoPlugin, ProcessorPlugin));
     }
 }
 
