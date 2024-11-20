@@ -8,7 +8,7 @@ use bevy::{
 // use bevy_pixels::prelude::*;
 
 pub const VRAM_BASE: usize = 0xA000000;
-pub const VRAM_SIZE: usize = 1_228_800; // VRAM ends at 0xA12C000
+pub const VRAM_SIZE: usize = 3_686_400; // VRAM ends at 0xA384000
 
 pub struct VideoPlugin;
 
@@ -28,8 +28,8 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle {
         projection: OrthographicProjection {
             scaling_mode: ScalingMode::Fixed {
-                width: 640.0,
-                height: 480.0,
+                width: 1280.0,
+                height: 420.0,
             },
             ..default()
         },
@@ -39,20 +39,20 @@ fn setup_camera(mut commands: Commands) {
 
 fn setup_fb_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     let size = Extent3d {
-        width: 640,
-        height: 480,
+        width: 1280,
+        height: 720,
         ..default()
     };
 
     let mut fb_image = Image {
         texture_descriptor: TextureDescriptor {
-            label: Some("Yardland 640x480 Framebuffer"),
+            label: Some("Yardland 1280x720 Framebuffer"),
             size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Uint,
-            usage: TextureUsages::all(),
+            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         },
         ..default()

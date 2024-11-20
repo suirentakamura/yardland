@@ -3,11 +3,11 @@
 #![feature(random)]
 // #![feature(core_intrinsics)]
 
-mod menus;
+//mod menus;
 mod machine;
 
-use menus::MenusPlugin;
-use machine::MachinePlugin;
+//use menus::MenusPlugin;
+//use machine::MachinePlugin;
 use std::{path::PathBuf, random::random};
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_egui::EguiPlugin;
@@ -28,7 +28,7 @@ pub fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Yardland".into(),
-                        resolution: WindowResolution::new(640., 480.),
+                        resolution: WindowResolution::new(1280., 720.),
                         ..default()
                     }),
                     ..default()
@@ -36,9 +36,9 @@ pub fn main() {
             EguiPlugin,
             // PixelsPlugin::default(),
         ))
-        .add_plugins((MachinePlugin, MenusPlugin))
+        //.add_plugins((MachinePlugin, MenusPlugin))
         .init_resource::<AppSettings>()
-        .add_systems(PostStartup, test_system)
+        //.add_systems(PostStartup, test_system)
         .run();
 
     /*

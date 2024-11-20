@@ -65,14 +65,14 @@ impl PhysicalMemory {
     /// Reads a value of a given type from the memory.
     pub fn read<T: FromBytesLE>(&self, index: usize) -> T {
         let lock = self.0.read().unwrap();
-        let (_, t) = T::from_bytes_le(&lock[index..size_of::<T>()]).unwrap();
+        let (_, t) = T::from_bytes_le(&lock[index..index + size_of::<T>()]).unwrap();
         t
     }
 
     /// Writes a value of a given type to the memory.
     pub fn write<T: ToBytesLE>(&mut self, index: usize, value: T) {
         let mut lock = self.0.write().unwrap();
-        lock[index..size_of::<T>()].copy_from_slice(&value.to_bytes_le().unwrap());
+        lock[index..index + size_of::<T>()].copy_from_slice(&value.to_bytes_le().unwrap());
     }
 
     /*
