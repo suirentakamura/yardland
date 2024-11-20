@@ -1,3 +1,63 @@
+use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+pub trait BasicIo {
+    fn buffer(&self) -> LockResult<RwLockReadGuard<'_, Vec<u8>>>;
+    fn len(&self) -> usize;
+    fn buffer_mut(&self) -> LockResult<RwLockWriteGuard<'_, Vec<u8>>>;
+    fn read_u8(&self, index: usize) -> u8;
+    fn write_u8(&self, index: usize, data: u8);
+}
+
+#[derive(Clone)]
+pub struct Memory {
+    buffer: Arc<RwLock<Vec<u8>>>,
+}
+
+impl Memory {
+    pub fn new(size: usize) -> Self {
+        Memory {
+            buffer: Arc::new(RwLock::new(vec![0u8; size])),
+        }
+    }
+
+    pub fn new_from_ref(buffer: Arc<RwLock<Vec<u8>>>) -> Self {
+        Memory {
+            buffer
+        }
+    }
+
+    pub fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]) {
+        let buffer = self.buffer.read().unwrap();
+        assert!(dest.len() >= size);
+        dest.copy_from_slice(&buffer[index..index + size]);
+    }
+}
+
+impl BasicIo for Memory {
+    fn len(&self) -> usize {
+        self.buffer.read().unwrap().len()
+    }
+
+    fn buffer(&self) -> LockResult<RwLockReadGuard<'_, Vec<u8>>> {
+        self.buffer.read()
+    }
+
+    fn buffer_mut(&self) -> LockResult<RwLockWriteGuard<'_, Vec<u8>>> {
+        self.buffer.write()
+    }
+
+    fn read_u8(&self, index: usize) -> u8 {
+        let buffer = self.buffer.read().unwrap();
+        buffer[index]
+    }
+
+    fn write_u8(&self, index: usize, data: u8) {
+        let mut buffer = self.buffer.write().unwrap();
+        buffer[index] = data;
+    }
+}
+
+/*
 #![allow(dead_code)]
 
 #[cfg(test)]
@@ -142,3 +202,4 @@ pub fn dma_transferb_r(src: u32, dest: u32, size: u32) {
         dma_transferb(real_src, real_dest, real_size);
     }
 }
+ */
