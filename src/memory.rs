@@ -1,35 +1,54 @@
 use std::sync::{Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+/// `BasicIo` is a trait that defines the basic read and write operations for a
+/// device in the 64-bit bus.
 pub trait BasicIo {
-    fn buffer(&self) -> LockResult<RwLockReadGuard<'_, Vec<u8>>>;
+    /// Returns the length of the memory buffer in bytes.
     fn len(&self) -> usize;
-    fn buffer_mut(&self) -> LockResult<RwLockWriteGuard<'_, Vec<u8>>>;
-    fn read_u8(&self, index: usize) -> u8;
-    fn write_u8(&self, index: usize, data: u8);
+
+    /// Reads a u64 from the memory buffer at the specified index.
+    fn read_u64(&self, index: usize) -> u64;
+
+    fn read_u8(&self, index: usize) -> u8 {
+        self.read_u64(index) as u8
+    }
+    fn read_u16(&self, index: usize) -> u16 {
+        self.read_u64(index) as u16
+    }
+    fn read_u32(&self, index: usize) -> u32 {
+        self.read_u64(index) as u32
+    }
+
+    /// Writes a u64 to the memory buffer at the specified index.
+    fn write_u64(&self, index: usize, data: u64);
+
+    fn write_u8(&self, index: usize, data: u8) {
+        self.write_u64(index, data as u64);
+    }
+    fn write_u16(&self, index: usize, data: u16) {
+        self.write_u64(index, data as u64);
+    }
+    fn write_u32(&self, index: usize, data: u32) {
+        self.write_u64(index, data as u64);
+    }
+
+    fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]);
 }
 
 #[derive(Clone)]
 pub struct Memory {
-    buffer: Arc<RwLock<Vec<u8>>>,
+    buffer: Arc<RwLock<Vec<u64>>>,
 }
 
 impl Memory {
     pub fn new(size: usize) -> Self {
-        Memory {
-            buffer: Arc::new(RwLock::new(vec![0u8; size])),
-        }
+        Self::new_from_ref(Arc::new(RwLock::new(vec![0u64; size / 8])))
     }
 
-    pub fn new_from_ref(buffer: Arc<RwLock<Vec<u8>>>) -> Self {
+    pub fn new_from_ref(buffer: Arc<RwLock<Vec<u64>>>) -> Self {
         Memory {
             buffer
         }
-    }
-
-    pub fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]) {
-        let buffer = self.buffer.read().unwrap();
-        assert!(dest.len() >= size);
-        dest.copy_from_slice(&buffer[index..index + size]);
     }
 }
 
@@ -38,22 +57,34 @@ impl BasicIo for Memory {
         self.buffer.read().unwrap().len()
     }
 
-    fn buffer(&self) -> LockResult<RwLockReadGuard<'_, Vec<u8>>> {
-        self.buffer.read()
-    }
-
-    fn buffer_mut(&self) -> LockResult<RwLockWriteGuard<'_, Vec<u8>>> {
-        self.buffer.write()
-    }
-
-    fn read_u8(&self, index: usize) -> u8 {
+    fn read_u64(&self, index: usize) -> u64 {
         let buffer = self.buffer.read().unwrap();
         buffer[index]
     }
 
-    fn write_u8(&self, index: usize, data: u8) {
+    fn write_u64(&self, index: usize, data: u64) {
         let mut buffer = self.buffer.write().unwrap();
         buffer[index] = data;
+    }
+
+    fn write_u8(&self, index: usize, data: u8) {
+        let mut buffer = self.buffer.write().unwrap();
+        buffer[index / 8] = (buffer[index / 8] & !(0xFF << (index % 8))) | ((data as u64) << (index % 8));
+    }
+
+    fn write_u16(&self, index: usize, data: u16) {
+        let mut buffer = self.buffer.write().unwrap();
+        buffer[index / 8] = (buffer[index / 8] & !(0xFFFF << (index % 8))) | ((data as u64) << (index % 8));
+    }
+
+    fn write_u32(&self, index: usize, data: u32) {
+        let mut buffer = self.buffer.write().unwrap();
+        buffer[index / 8] = (buffer[index / 8] & !(0xFFFFFFFF << (index % 8))) | ((data as u64) << (index % 8));
+    }
+
+    fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]) {
+        let buffer = self.buffer.read().unwrap();
+        dest.copy_from_slice(bytemuck::cast_slice(&buffer[index..index + size]));
     }
 }
 

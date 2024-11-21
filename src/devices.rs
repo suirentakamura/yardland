@@ -1,5 +1,7 @@
 use std::{io::Read, sync::{Arc, Mutex}};
 
+use log::warn;
+
 use crate::memory::BasicIo;
 
 pub struct DeviceDefinition {
@@ -45,13 +47,19 @@ impl DeviceManager {
     }
 
     pub fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]) {
-        for device in &self.devices {
-            if index >= device.start && index < device.start + device.io.len() {
-                assert!(device.io.len() >= size, "device io len mismatch");
-                assert!(dest.len() >= size, "dest slice len mismatch");
+        //let mut size = size;
 
-                let buffer = device.io.buffer_mut().unwrap();
-                dest.copy_from_slice(&buffer[index..index + size]);
+        for device in &self.devices {
+            let device_len = device.io.len();
+
+            if index >= device.start && index < device.start + device_len {
+                //assert!(device.io.len() != size, "device io len mismatch {} != {}", device.io.len(), size);
+                //assert!(dest.len() != size, "dest slice len mismatch {} != {}", dest.len(), size);
+
+                let device_index = index - device.start;
+                // size -= device_len - device_index;
+                device.io.copy_into_slice(device_index, device_len, &mut dest[..device_len]);
+                return;
             }
         }
     }
@@ -62,14 +70,6 @@ pub struct KeyboardDevice;
 impl BasicIo for KeyboardDevice {
     fn len(&self) -> usize {
         2
-    }
-
-    fn buffer(&self) -> std::sync::LockResult<std::sync::RwLockReadGuard<'_, Vec<u8>>> {
-        unimplemented!()
-    }
-
-    fn buffer_mut(&self) -> std::sync::LockResult<std::sync::RwLockWriteGuard<'_, Vec<u8>>> {
-        unimplemented!()
     }
 
     fn read_u8(&self, index: usize) -> u8 {
@@ -89,6 +89,10 @@ impl BasicIo for KeyboardDevice {
     fn write_u8(&self, index: usize, data: u8) {
         unimplemented!()
     }
+
+    fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]) {
+        unimplemented!()
+    }
 }
 
 pub struct RomDevice(Arc<Mutex<Vec<u8>>>);
@@ -105,19 +109,16 @@ impl BasicIo for RomDevice {
         data.len()
     }
 
-    fn buffer(&self) -> std::sync::LockResult<std::sync::RwLockReadGuard<'_, Vec<u8>>> {
-        self.0.lock()
-    }
-
-    fn buffer_mut(&self) -> std::sync::LockResult<std::sync::RwLockWriteGuard<'_, Vec<u8>>> {
-        unimplemented!()
-    }
-
     fn read_u8(&self, index: usize) -> u8 {
         let data = self.0.lock().unwrap();
         data[index]
     }
 
     fn write_u8(&self, index: usize, data: u8) {
+    }
+
+    fn copy_into_slice(&self, index: usize, size: usize, dest: &mut [u8]) {
+        let buffer = self.0.lock().unwrap();
+        dest.copy_from_slice(&buffer[index..index + size]);
     }
 }
