@@ -25,17 +25,20 @@ impl Plugin for VideoPlugin {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Camera2d::default(),
+        OrthographicProjection {
             scaling_mode: ScalingMode::Fixed {
-                width: 1280.0,
-                height: 420.0,
+                width: 1280.,
+                height: 720.,
             },
-            ..default()
-        },
-        ..default()
-    });
+            ..OrthographicProjection::default_2d()
+        }
+    ));
 }
+
+#[derive(Component)]
+struct FbSprite;
 
 fn setup_fb_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     let size = Extent3d {
@@ -46,13 +49,13 @@ fn setup_fb_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 
     let mut fb_image = Image {
         texture_descriptor: TextureDescriptor {
-            label: Some("Yardland 1280x720 Framebuffer"),
+            label: Some("Yardland Framebuffer"),
             size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
             format: TextureFormat::Rgba8Unorm,
-            usage: TextureUsages::RENDER_ATTACHMENT,
+            usage: TextureUsages::all(),
             view_formats: &[],
         },
         ..default()
@@ -60,10 +63,13 @@ fn setup_fb_texture(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 
     fb_image.resize(size);
 
-    commands.spawn(SpriteBundle {
-        texture: images.add(fb_image),
-        ..default()
-    });
+    commands.spawn((
+        Sprite {
+            image: images.add(fb_image),
+            ..default()
+        },
+        FbSprite
+    ));
 }
 
 #[derive(Resource)]
@@ -75,16 +81,17 @@ fn draw_fb(
     mut timer: ResMut<DrawFbTimer>,
     time: Res<Time>,
     memory: Res<PhysicalMemory>,
-    fb_handle_query: Query<&Handle<Image>, With<Sprite>>
+    sprite_query: Query<&Sprite, With<FbSprite>>,
 ) {
     timer.0.tick(time.delta());
 
     if timer.0.just_finished() && memory.can_read() {
-        let fb_handle = fb_handle_query.get_single().unwrap();
-        let fb_image = images.get_mut(fb_handle).unwrap();
+        let sprite = sprite_query.get_single().unwrap();
+        let fb_handle = sprite.image.clone();
+        let fb_image = images.get_mut(fb_handle.id()).unwrap();
 
         assert_eq!(fb_image.data.len(), VRAM_SIZE, "Framebuffer image data size mismatch!");
-        memory.copy_to_slice(VRAM_BASE, VRAM_SIZE, fb_image.data.as_mut_slice());
+        memory.copy_to_slice(VRAM_BASE, fb_image.data.len(), fb_image.data.as_mut_slice());
     }
 }
 

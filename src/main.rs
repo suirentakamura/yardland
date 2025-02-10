@@ -3,11 +3,11 @@
 #![feature(random)]
 // #![feature(core_intrinsics)]
 
-//mod menus;
+mod menus;
 mod machine;
 
-//use menus::MenusPlugin;
-//use machine::MachinePlugin;
+use menus::MenusPlugin;
+use machine::MachinePlugin;
 use std::{path::PathBuf, random::random};
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_egui::EguiPlugin;
@@ -22,23 +22,19 @@ struct AppSettings {
 
 pub fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins
-                .build()
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Yardland".into(),
-                        resolution: WindowResolution::new(1280., 720.),
-                        ..default()
-                    }),
+        .add_plugins(DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Yardland".into(),
+                    resolution: WindowResolution::new(1280., 720.),
                     ..default()
                 }),
-            EguiPlugin,
-            // PixelsPlugin::default(),
-        ))
-        //.add_plugins((MachinePlugin, MenusPlugin))
+                ..default()
+        }))
+        .add_plugins((EguiPlugin /*, PixelsPlugin::default() */))
+        .add_plugins((MachinePlugin, MenusPlugin))
         .init_resource::<AppSettings>()
-        //.add_systems(PostStartup, test_system)
+        .add_systems(PostStartup, test_system)
         .run();
 
     /*

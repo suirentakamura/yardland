@@ -1,5 +1,5 @@
 use crate::{machine::{memory::PhysicalMemory, processor::TestProcessor}, AppSettings};
-use bevy::prelude::*;
+use bevy::{color::palettes::tailwind, prelude::*};
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{TableBuilder, Column};
 use rfd::FileDialog;
@@ -8,13 +8,11 @@ pub struct MenusPlugin;
 
 impl Plugin for MenusPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update,
-            control_window_system
-        );
+        app.add_systems(Update, control_window_system);
     }
 }
 
-fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSettings>, processor: Res<TestProcessor>, _memory: Res<PhysicalMemory>) {
+fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSettings>, processor: Res<TestProcessor>, memory: Res<PhysicalMemory>) {
     if let Some(ctx_mut) = contexts.try_ctx_mut() {
         egui::Window::new("Control").show(ctx_mut, |ui| {
             ui.horizontal(|ui| {
@@ -30,7 +28,9 @@ fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSet
 
             ui.separator();
 
-            ui.collapsing("CPU", |ui| {
+            ui.group(|ui| {
+                ui.label("CPU");
+
                 ui.horizontal(|ui| {
                     ui.checkbox(&mut settings.running, "Running?");
                     ui.checkbox(&mut settings.trace, "Trace?");
@@ -46,14 +46,14 @@ fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSet
                     }
                 });
 
-                if processor.frequency < 1_000.0 {
+                if processor.frequency < 1_000. {
                     ui.label(format!("Frequency: {:.0} Hz", processor.frequency));
-                } else if processor.frequency < 1_000_000.0 {
-                    ui.label(format!("Frequency: {:.03} KHz", processor.frequency / 1_000.0));
-                } else if processor.frequency < 1_000_000_000.0 {
-                    ui.label(format!("Frequency: {:.03} MHz", processor.frequency / 1_000_000.0));
+                } else if processor.frequency < 1_000_000. {
+                    ui.label(format!("Frequency: {:.03} KHz", processor.frequency / 1_000.));
+                } else if processor.frequency < 1_000_000_000. {
+                    ui.label(format!("Frequency: {:.03} MHz", processor.frequency / 1_000_000.));
                 } else {
-                    ui.label(format!("Frequency: {:.02} GHz", processor.frequency / 1_000_000_000.0));
+                    ui.label(format!("Frequency: {:.02} GHz", processor.frequency / 1_000_000_000.));
                 }
 
                 ui.separator();
@@ -62,18 +62,12 @@ fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSet
                     ui.horizontal(|ui| {
                         ui.label("A: 0x0000000000000000");
                         ui.label("B: 0x0000000000000000");
-                    });
-                    ui.horizontal(|ui| {
                         ui.label("C: 0x0000000000000000");
-                        ui.label("D: 0x0000000000000000");
                     });
                     ui.horizontal(|ui| {
                         ui.label("X: 0x0000000000000000");
                         ui.label("Y: 0x0000000000000000");
-                    });
-                    ui.horizontal(|ui| {
                         ui.label("Z: 0x0000000000000000");
-                        ui.label("W: 0x0000000000000000");
                     });
                     ui.horizontal(|ui| {
                         ui.label("PC: 0x0000000000000000");
@@ -86,9 +80,11 @@ fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSet
                 });
             });
 
-            ui.collapsing("GPU", |ui| {
+            ui.group(|ui| {
+                ui.label("GPU");
+
                 ui.label("Type: Simple Framebuffer");
-                ui.label("Resolution: 640x480");
+                ui.label("Resolution: 1280x720");
                 ui.label("Color depth: RGBA 32-bpp color");
 
                 use crate::machine::video::{VRAM_BASE, VRAM_SIZE};
@@ -96,11 +92,11 @@ fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSet
                 ui.label(format!("VRAM Range: 0x{:016X} - 0x{:016X}", VRAM_BASE, VRAM_BASE + VRAM_SIZE));
                 ui.label(format!("VRAM Size: {} bytes", VRAM_SIZE));
             });
-            /*
+
             ui.collapsing("Memory", |ui| {
                 memory_map(ui, &memory);
             });
-            */
+
         });
     }
 }
@@ -108,30 +104,42 @@ fn control_window_system(mut contexts: EguiContexts, mut settings: ResMut<AppSet
 /// Memory map widget
 fn memory_map(ui: &mut egui::Ui, physical_memory: &PhysicalMemory) {
     let memory = physical_memory.lock_read().unwrap();
-    let mut table = TableBuilder::new(ui);
 
-    /*
+    let mut goto = String::new();
+    let mut do_goto = false;
+    let mut parsed_row = 0u64;
+
     ui.horizontal(|ui| {
         ui.label("Goto address: ");
 
-        let mut goto = String::new();
-        ui.text_edit_singleline(&mut goto);
+        do_goto = ui.text_edit_singleline(&mut goto).clicked() | ui.button("Go").clicked();
 
-        if ui.button("Go").clicked() {
-            table = table.scroll_to_row(usize::from_str_radix(&goto, 16).unwrap() / 16, Some(egui::Align::Min));
+        if do_goto {
+            if let Ok(prow) = u64::from_str_radix(&goto, 16) {
+                parsed_row = prow;
+            } else {
+                ui.colored_label(egui::Rgba::RED, "Invalid hex address!");
+                do_goto = false;
+            }
         }
     });
 
     ui.separator();
-    */
 
     // Table begins here
+
+    let mut table = TableBuilder::new(ui);
 
     table = table.striped(true)
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::auto())
         .columns(Column::auto(), 16)
         .column(Column::auto());
+
+    if do_goto {
+        let row = parsed_row as f64 / 16.;
+        table = table.scroll_to_row(row.floor() as usize, Some(egui::Align::Min));
+    }
 
     table
         .header(20., |mut header| {
@@ -160,6 +168,7 @@ fn memory_map(ui: &mut egui::Ui, physical_memory: &PhysicalMemory) {
                     ui.monospace(format!("{:016X}", i * 16));
                 });
 
+                /*
                 for j in 0..16usize {
                     if j < bytes.len() {
                         row.col(|ui| {
@@ -171,6 +180,7 @@ fn memory_map(ui: &mut egui::Ui, physical_memory: &PhysicalMemory) {
                         });
                     }
                 }
+                */
 
                 row.col(|ui| {
                     ui.monospace(format!("{}",
